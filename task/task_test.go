@@ -38,6 +38,27 @@ func TestTask_AddChild(t *testing.T) {
 	}
 }
 
+func TestTask_AddChildCheckParent(t *testing.T) {
+	parent := NewTask("parent", []string{})
+	child := NewTask("child", []string{"parent"})
+
+	err := parent.AddChild(child)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(parent.children, map[string]*Task{"child": child}) {
+		t.Errorf("Child %v wasn't added correctly to %v", child, parent)
+	}
+
+	if parent.parent != nil {
+		t.Error("Parent of parent should be nil")
+	}
+	if child.parent != parent {
+		t.Error("Parent doesn't set to child")
+	}
+}
+
 func TestTask_AddChildDup(t *testing.T) {
 	parent := NewTask("parent", []string{})
 	child := NewTask("child", []string{"parent"})

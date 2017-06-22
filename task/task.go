@@ -3,13 +3,16 @@ package task
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
 type Task struct {
+	sync.RWMutex
 	Name     string
 	Priority int
 	requires map[string]bool
 	children map[string]*Task
+	parent   *Task
 }
 
 func NewTask(name string, requires []string) *Task {
@@ -25,16 +28,22 @@ func NewTask(name string, requires []string) *Task {
 }
 
 func (t *Task) IsRoot() bool {
+	t.RLock()
+	defer t.RUnlock()
 	return len(t.requires) == 0
 }
 
 func (t *Task) AddChild(child *Task) error {
+	t.Lock()
+	defer t.Unlock()
+
 	_, ok := child.requires[t.Name]
 	if ok == false {
 		return errors.New(fmt.Sprintf("Task '%s' can't be parent for '%s'. "+
 			"It doesn't require '%s'", t.Name, child.Name, t.Name))
 	}
 	t.children[child.Name] = child
+	child.parent = t
 	return nil
 }
 

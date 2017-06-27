@@ -98,3 +98,56 @@ func TestJobsBuilder_AddTaskInDifferentOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestJobsBuilder_Check(t *testing.T) {
+	cases := []struct {
+		tasks    []*Task
+		hasError bool
+	}{
+		{
+			tasks:    []*Task{},
+			hasError: false,
+		},
+		{
+			tasks: []*Task{
+				NewTask("root", []string{}),
+			},
+			hasError: false,
+		},
+		{
+			tasks: []*Task{
+				NewTask("root", []string{}),
+				NewTask("child1", []string{"root"}),
+				NewTask("child2", []string{"root"}),
+			},
+			hasError: false,
+		},
+		{
+			tasks: []*Task{
+				NewTask("child1", []string{"root"}),
+				NewTask("child2", []string{"root"}),
+				NewTask("root", []string{}),
+			},
+			hasError: false,
+		},
+		{
+			tasks: []*Task{
+				NewTask("child1", []string{"root"}),
+				NewTask("child2", []string{"root"}),
+			},
+			hasError: true,
+		},
+	}
+
+	for _, c := range cases {
+		builder := NewJobsBuilder()
+		for _, t := range c.tasks {
+			builder.AddJob(NewJob(t), false)
+		}
+		if (builder.Check() != nil) != c.hasError {
+			t.Errorf("Tasks set has expected error state: %b. Tasks: %v",
+				c.hasError, c.tasks)
+		}
+
+	}
+}

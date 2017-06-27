@@ -1,8 +1,10 @@
 package lib
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -73,5 +75,25 @@ func (builder *JobsBuilder) AddJob(job *Job, checkDuplication bool) error {
 		builder.roots[job.task.Name] = job
 	}
 
+	return nil
+}
+
+func (builder *JobsBuilder) Check() error {
+	if i := 0; len(builder.waitingForParent) > 0 {
+		var buffer bytes.Buffer
+		buffer.WriteString("Jobs are invalid. Have waiting for parents jobs: ")
+		for parent, jobs := range builder.waitingForParent {
+			jobsNames := make([]string, len(builder.waitingForParent))
+			for _, job := range jobs {
+				jobsNames = append(jobsNames, job.task.Name)
+			}
+			msg := fmt.Sprintf("%s: %s", parent, strings.Join(jobsNames, ","))
+			if len(builder.waitingForParent) == i {
+				msg += ","
+			}
+			buffer.WriteString(msg)
+		}
+		return errors.New(buffer.String())
+	}
 	return nil
 }

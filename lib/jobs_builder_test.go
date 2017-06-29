@@ -99,7 +99,7 @@ func TestJobsBuilder_AddTaskInDifferentOrder(t *testing.T) {
 	}
 }
 
-func TestJobsBuilder_Check(t *testing.T) {
+func TestJobsBuilder_checkWaitingParents(t *testing.T) {
 	cases := []struct {
 		tasks    []*Task
 		hasError bool
@@ -144,10 +144,81 @@ func TestJobsBuilder_Check(t *testing.T) {
 		for _, t := range c.tasks {
 			builder.AddJob(NewJob(t), false)
 		}
-		if (builder.Check() != nil) != c.hasError {
+		if (builder.checkWaitingParents() != nil) != c.hasError {
 			t.Errorf("Tasks set has expected error state: %b. Tasks: %v",
 				c.hasError, c.tasks)
 		}
 
+	}
+}
+
+func TestJobsBuilder_checkRoots(t *testing.T) {
+	cases := []struct {
+		jobs []*Job
+		err  string
+	}{
+		{
+			jobs: []*Job{},
+			err:  "No root jobs found",
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{"t1"})),
+			},
+			err: "No root jobs found",
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{"t2"})),
+				NewJob(NewTask("t2", []string{"t1"})),
+			},
+			err: "No root jobs found",
+		},
+	}
+
+	for _, c := range cases {
+		builder := NewJobsBuilder()
+		for _, job := range c.jobs {
+			builder.AddJob(job, true)
+		}
+		if act := builder.checkRoots(); act == nil || c.err != act.Error() {
+			t.Errorf("Expected error: %v, got: %v", c.err, act)
+		}
+
+	}
+}
+
+func TestJobsBuilder_checkCycles(t *testing.T) {
+	cases := []struct {
+		jobs []*Job
+		err  string
+	}{
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t1", "t3"})),
+				NewJob(NewTask("t3", []string{"t2"})),
+			},
+			err: "Following cycles are found for the root job t1: from t3 to t2",
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t1", "t2"})),
+			},
+			err: "Following cycles are found for the root job t1: from t2 to t2",
+		},
+	}
+	for _, c := range cases {
+		builder := NewJobsBuilder()
+		for _, job := range c.jobs {
+			err := builder.AddJob(job, true)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+		if act := builder.checkCycles(); act == nil || c.err != act.Error() {
+			t.Errorf("Expected error: %v, got: %v", c.err, act)
+		}
 	}
 }

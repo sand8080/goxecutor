@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -23,6 +24,22 @@ func NewJobsBuilder() *JobsBuilder {
 		waitingForParent: make(map[string][]*Job),
 	}
 	return &builder
+}
+
+// Job color is used for cycles detection
+type jobColor uint8
+
+const WHITE jobColor = 0
+const GREY jobColor = 1
+const BLACK jobColor = 2
+
+type jobsCycle struct {
+	from string
+	to   string
+}
+
+type jobDiscoverState struct {
+	color jobColor
 }
 
 // Adds task to the appropriate lib. If checkDuplication is true error will
@@ -79,6 +96,19 @@ func (builder *JobsBuilder) AddJob(job *Job, checkDuplication bool) error {
 }
 
 func (builder *JobsBuilder) Check() error {
+	if err := builder.checkRoots(); err != nil {
+		return err
+	}
+	if err := builder.checkWaitingParents(); err != nil {
+		return err
+	}
+	if err := builder.checkCycles(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (builder *JobsBuilder) checkWaitingParents() error {
 	if i := 0; len(builder.waitingForParent) > 0 {
 		var buffer bytes.Buffer
 		buffer.WriteString("Jobs are invalid. Have waiting for parents jobs: ")
@@ -96,4 +126,70 @@ func (builder *JobsBuilder) Check() error {
 		return errors.New(buffer.String())
 	}
 	return nil
+}
+
+func (builder *JobsBuilder) checkRoots() error {
+	if len(builder.roots) == 0 {
+		return errors.New("No root jobs found")
+	}
+	return nil
+}
+
+func (builder *JobsBuilder) checkCycles() error {
+	discover := make(map[string]jobColor, len(builder.jobs))
+	errs := make(map[string][]jobsCycle, len(builder.roots))
+
+	// Sort root names for fixing root jobs processing order.
+	// It is useful for cycles reporting.
+	rootNames := make([]string, 0, len(builder.roots))
+	for name := range builder.roots {
+		rootNames = append(rootNames, name)
+	}
+	sort.Strings(rootNames)
+
+	for _, root := range builder.roots {
+		cycles := make([]jobsCycle, 0)
+		builder.depthFirstSearch(root, discover, &cycles)
+		if len(cycles) > 0 {
+			errs[root.task.Name] = cycles
+		}
+	}
+
+	if len(errs) > 0 {
+		return makeErrorMessage(errs)
+	}
+	return nil
+}
+
+func (builder *JobsBuilder) depthFirstSearch(job *Job, discover map[string]jobColor,
+	cycles *[]jobsCycle) {
+	discover[job.task.Name] = GREY
+	for _, child := range job.children {
+		child_color := discover[child.task.Name]
+		if child_color == WHITE {
+			builder.depthFirstSearch(child, discover, cycles)
+		} else if child_color == GREY {
+			*cycles = append(*cycles, jobsCycle{job.task.Name, child.task.Name})
+		}
+	}
+	discover[job.task.Name] = BLACK
+}
+
+func makeErrorMessage(errs map[string][]jobsCycle) error {
+	msgs := make([]string, 0, len(errs))
+	for rootName, cycles := range errs {
+		if len(cycles) >= 0 {
+			var b bytes.Buffer
+			fmt.Fprintf(&b, "Following cycles are found for the root job %s: ",
+				rootName)
+			cycle := cycles[0]
+			fmt.Fprintf(&b, "from %s to %s", cycle.from, cycle.to)
+			for _, cycle := range cycles[1:] {
+				fmt.Fprintf(&b, ", from %s to %s", cycle.from, cycle.to)
+			}
+
+			msgs = append(msgs, b.String())
+		}
+	}
+	return errors.New(strings.Join(msgs, "\n"))
 }

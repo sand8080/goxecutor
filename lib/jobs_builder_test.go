@@ -218,6 +218,16 @@ func TestJobsBuilder_checkCycles(t *testing.T) {
 			},
 			err: "Following cycles are found for the root job t1: from t4 to t2",
 		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t4"})),
+				NewJob(NewTask("t3", []string{"t2"})),
+				NewJob(NewTask("t4", []string{"t3"})),
+				NewJob(NewTask("t5", []string{"t5"})),
+			},
+			err: "Following jobs unreached: t2, t3, t4, t5",
+		},
 	}
 	for _, c := range cases {
 		builder := NewJobsBuilder()
@@ -283,6 +293,13 @@ func TestJobsBuilder_Check(t *testing.T) {
 			},
 			err: errors.New("Following cycles are found for the root job t1: from t3 to t2, " +
 				"from t4 to t4"),
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t2"})),
+			},
+			err: errors.New("Following jobs unreached: t2"),
 		},
 	}
 	for _, c := range cases {

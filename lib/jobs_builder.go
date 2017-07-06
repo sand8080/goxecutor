@@ -167,6 +167,20 @@ func (builder *JobsBuilder) checkCycles() error {
 	if len(errs) > 0 {
 		return makeErrorMessage(errs)
 	}
+
+	// Checking all jobs are reached
+	if len(discover) < len(builder.jobs) {
+		unreached := make([]string, 0, len(builder.jobs)-len(discover))
+		for jobName := range builder.jobs {
+			_, ok := discover[jobName]
+			if !ok {
+				unreached = append(unreached, jobName)
+			}
+		}
+		sort.Strings(unreached)
+		return errors.New(fmt.Sprintf("Following jobs unreached: %s",
+			strings.Join(unreached, ", ")))
+	}
 	return nil
 }
 

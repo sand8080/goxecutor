@@ -111,15 +111,24 @@ func (builder *JobsBuilder) Check() error {
 func (builder *JobsBuilder) checkWaitingParents() error {
 	if i := 0; len(builder.waitingForParent) > 0 {
 		var buffer bytes.Buffer
-		buffer.WriteString("Jobs are invalid. Have waiting for parents jobs: ")
-		for parent, jobs := range builder.waitingForParent {
-			jobsNames := make([]string, len(builder.waitingForParent))
+		buffer.WriteString("Jobs graph is incomplete. Have waiting for parents jobs: ")
+		// Building sorted parents names slice
+		parentsNames := make([]string, 0, len(builder.waitingForParent))
+		for parentName := range builder.waitingForParent {
+			parentsNames = append(parentsNames, parentName)
+		}
+		sort.Strings(parentsNames)
+
+		for _, parentName := range parentsNames {
+			i += 1
+			jobs := builder.waitingForParent[parentName]
+			jobsNames := make([]string, 0, len(jobs))
 			for _, job := range jobs {
 				jobsNames = append(jobsNames, job.task.Name)
 			}
-			msg := fmt.Sprintf("%s: %s", parent, strings.Join(jobsNames, ","))
-			if len(builder.waitingForParent) == i {
-				msg += ","
+			msg := fmt.Sprintf("%s is required for: %s", parentName, strings.Join(jobsNames, ", "))
+			if len(builder.waitingForParent) > i {
+				msg += "; "
 			}
 			buffer.WriteString(msg)
 		}

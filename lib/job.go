@@ -1,8 +1,10 @@
 package lib
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -42,6 +44,25 @@ func NewJob(task *Task) *Job {
 	return &job
 }
 
+func (job *Job) String() string {
+	var b bytes.Buffer
+	fmt.Fprintf(&b, "Job %q\n", job.task.Name)
+
+	parents := make([]string, 0, len(job.parents))
+	for p := range job.parents {
+		parents = append(parents, p)
+	}
+	fmt.Fprintf(&b, "\tparents: %s\n", strings.Join(parents, ","))
+
+	children := make([]string, 0, len(job.children))
+	for c := range job.children {
+		children = append(children, c)
+	}
+	fmt.Fprintf(&b, "\tchildren: %s", strings.Join(children, ","))
+
+	return b.String()
+}
+
 func (job *Job) isRoot() bool {
 	return len(job.task.Requires) == 0
 }
@@ -56,8 +77,11 @@ func (job *Job) addChild(child *Job) error {
 
 	job.Lock()
 	defer job.Unlock()
-	child.Lock()
-	defer child.Unlock()
+	// In case of self loop we shouldn't lock job again
+	if job != child {
+		child.Lock()
+		defer child.Unlock()
+	}
 
 	job.children[child.task.Name] = child
 	child.parents[job.task.Name] = job

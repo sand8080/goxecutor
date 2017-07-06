@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"errors"
 	"github.com/cznic/mathutil"
 	"sort"
 	"testing"
@@ -99,7 +100,7 @@ func TestJobsBuilder_AddTaskInDifferentOrder(t *testing.T) {
 	}
 }
 
-func TestJobsBuilder_Check(t *testing.T) {
+func TestJobsBuilder_checkWaitingParents(t *testing.T) {
 	cases := []struct {
 		tasks    []*Task
 		hasError bool
@@ -144,10 +145,163 @@ func TestJobsBuilder_Check(t *testing.T) {
 		for _, t := range c.tasks {
 			builder.AddJob(NewJob(t), false)
 		}
-		if (builder.Check() != nil) != c.hasError {
+		if (builder.checkWaitingParents() != nil) != c.hasError {
 			t.Errorf("Tasks set has expected error state: %b. Tasks: %v",
 				c.hasError, c.tasks)
 		}
 
+	}
+}
+
+func TestJobsBuilder_checkRoots(t *testing.T) {
+	cases := []struct {
+		jobs []*Job
+		err  string
+	}{
+		{
+			jobs: []*Job{},
+			err:  "No root jobs found",
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{"t1"})),
+			},
+			err: "No root jobs found",
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{"t2"})),
+				NewJob(NewTask("t2", []string{"t1"})),
+			},
+			err: "No root jobs found",
+		},
+	}
+
+	for _, c := range cases {
+		builder := NewJobsBuilder()
+		for _, job := range c.jobs {
+			builder.AddJob(job, true)
+		}
+		if act := builder.checkRoots(); act == nil || c.err != act.Error() {
+			t.Errorf("Expected error: %v, got: %v", c.err, act)
+		}
+
+	}
+}
+
+func TestJobsBuilder_checkCycles(t *testing.T) {
+	cases := []struct {
+		jobs []*Job
+		err  string
+	}{
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t1", "t3"})),
+				NewJob(NewTask("t3", []string{"t2"})),
+			},
+			err: "Following cycles are found for the root job t1: from t3 to t2",
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t1", "t2"})),
+			},
+			err: "Following cycles are found for the root job t1: from t2 to t2",
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t1", "t4"})),
+				NewJob(NewTask("t3", []string{"t2"})),
+				NewJob(NewTask("t4", []string{"t3"})),
+			},
+			err: "Following cycles are found for the root job t1: from t4 to t2",
+		},
+	}
+	for _, c := range cases {
+		builder := NewJobsBuilder()
+		for _, job := range c.jobs {
+			err := builder.AddJob(job, true)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+		if act := builder.checkCycles(); act == nil || c.err != act.Error() {
+			t.Errorf("Expected error: %v, got: %v", c.err, act)
+		}
+	}
+}
+
+func TestJobsBuilder_Check(t *testing.T) {
+	cases := []struct {
+		jobs []*Job
+		err  error
+	}{
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t1"})),
+				NewJob(NewTask("t3", []string{"t2"})),
+			},
+			err: nil,
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("root1", []string{})),
+				NewJob(NewTask("root2", []string{})),
+				NewJob(NewTask("child20", []string{"root2"})),
+			},
+			err: nil,
+		},
+		{
+			jobs: []*Job{},
+			err:  errors.New("No root jobs found"),
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t2", []string{"t1"})),
+			},
+			err: errors.New("No root jobs found"),
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t3", []string{"t2", "t4"})),
+				NewJob(NewTask("t5", []string{"t2"})),
+			},
+			err: errors.New("Jobs graph is incomplete. " +
+				"Have waiting for parents jobs: t2 is required for: t3, t5; " +
+				"t4 is required for: t3"),
+		},
+		{
+			jobs: []*Job{
+				NewJob(NewTask("t1", []string{})),
+				NewJob(NewTask("t2", []string{"t3", "t1"})),
+				NewJob(NewTask("t3", []string{"t2"})),
+				NewJob(NewTask("t4", []string{"t1", "t4"})),
+			},
+			err: errors.New("Following cycles are found for the root job t1: from t3 to t2, " +
+				"from t4 to t4"),
+		},
+	}
+	for _, c := range cases {
+		builder := NewJobsBuilder()
+		for _, job := range c.jobs {
+			err := builder.AddJob(job, true)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+		act := builder.Check()
+		if c.err == nil {
+			if act != nil {
+				t.Errorf("Expected error: %v, got: %v", c.err, act)
+			}
+		} else {
+			if act == nil || c.err.Error() != act.Error() {
+				t.Errorf("Expected error: %v, got: %v", c.err, act)
+			}
+		}
 	}
 }

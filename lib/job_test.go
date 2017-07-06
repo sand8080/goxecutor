@@ -37,6 +37,22 @@ func TestJob_addChild(t *testing.T) {
 	}
 }
 
+func TestJob_addChildSelfLoop(t *testing.T) {
+	job := NewJob(NewTask("job", []string{"job"}))
+
+	err := job.addChild(job)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(job.children, map[string]*Job{"job": job}) {
+		t.Errorf("Self looped job creation failed")
+	}
+	if !reflect.DeepEqual(job.parents, map[string]*Job{"job": job}) {
+		t.Errorf("Self looped job creation failed")
+	}
+}
+
 func TestJob_addChildCheckParent(t *testing.T) {
 	parent := NewJob(NewTask("parent", []string{}))
 	child := NewJob(NewTask("child", []string{"parent"}))

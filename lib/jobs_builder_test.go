@@ -146,7 +146,7 @@ func TestJobsBuilder_checkWaitingParents(t *testing.T) {
 			builder.AddJob(NewJob(t), false)
 		}
 		if (builder.checkWaitingParents() != nil) != c.hasError {
-			t.Errorf("Tasks set has expected error state: %b. Tasks: %v",
+			t.Errorf("Tasks set has expected error state: %t. Tasks: %v",
 				c.hasError, c.tasks)
 		}
 

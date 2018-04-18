@@ -16,5 +16,8 @@
 # Makefile produced dirs
 .GOPATH
 
+# Git
+.gitconfig
+
 # IDE project files
 .idea

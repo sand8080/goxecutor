@@ -2,31 +2,15 @@ package task
 
 import (
 	"context"
-	"errors"
-	"sync"
 	"testing"
 
+	"errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
 func init() {
 	log.SetLevel(log.DebugLevel)
-}
-
-type payloadSyncExec struct {
-	taskID ID
-	wg     *sync.WaitGroup
-}
-
-func syncedExedFunc(payload interface{}) error {
-	log.Debugf("syncedExedFunc called with: %v", payload)
-	p, ok := payload.(payloadSyncExec)
-	if !ok {
-		return errors.New("syncedExedFunc failed on payload cast to payloadSyncExec")
-	}
-	defer p.wg.Done()
-	return nil
 }
 
 func dumpExecFunc(payload interface{}) error {
@@ -51,7 +35,7 @@ func TestNewTask(t *testing.T) {
 	assert.NotNil(t, withReq.waitingID)
 }
 
-func TestTask_AddChild_NoMaxCount(t *testing.T) {
+func TestTask_AddChild(t *testing.T) {
 	parent := NewTask("P", nil, nil, dumpExecFunc)
 	chOne := *NewTask("ChOne", []ID{"P"}, nil, dumpExecFunc)
 	err := parent.AddChild(chOne)
@@ -93,16 +77,13 @@ func TestTask_AddChild_AlreadyAdded(t *testing.T) {
 	assert.Error(t, ErrChildAlreadyAdded, parent.AddChild(chOne))
 }
 
-func Test_Exec(t *testing.T) {
-	var wg sync.WaitGroup
-	wg.Add(4)
-
-	parent := NewTask("P", nil, payloadSyncExec{taskID: "P", wg: &wg}, syncedExedFunc)
-	chOne := NewTask("ChOne", []ID{"P"}, payloadSyncExec{taskID: "ChOne", wg: &wg}, syncedExedFunc)
+func TestExec(t *testing.T) {
+	parent := NewTask("P", nil, "P", dumpExecFunc)
+	chOne := NewTask("ChOne", []ID{"P"}, "ChOne", dumpExecFunc)
 	assert.NoError(t, parent.AddChild(*chOne))
-	chTwo := NewTask("ChTwo", []ID{"P"}, payloadSyncExec{taskID: "ChTwo", wg: &wg}, syncedExedFunc)
+	chTwo := NewTask("ChTwo", []ID{"P"}, "ChTwo", dumpExecFunc)
 	assert.NoError(t, parent.AddChild(*chTwo))
-	chLeaf := NewTask("ChLeaf", []ID{"ChOne", "ChTwo"}, payloadSyncExec{taskID: "ChLeaf", wg: &wg}, syncedExedFunc)
+	chLeaf := NewTask("ChLeaf", []ID{"ChOne", "ChTwo"}, "ChLeaf", dumpExecFunc)
 	assert.NoError(t, chOne.AddChild(*chLeaf))
 	assert.NoError(t, chTwo.AddChild(*chLeaf))
 
@@ -113,10 +94,64 @@ func Test_Exec(t *testing.T) {
 
 	// Waiting Exec result for data consistency guarantee
 	assert.NoError(t, Exec(ctx, cancelFunc, chLeaf))
-	wg.Wait()
 
-	assert.Equal(t, parent.Status, StatusReady)
-	assert.Equal(t, chOne.Status, StatusReady)
-	assert.Equal(t, chTwo.Status, StatusReady)
-	assert.Equal(t, chLeaf.Status, StatusReady)
+	checks := []struct {
+		task      *Task
+		statusExp Status
+	}{
+		{parent, StatusReady},
+		{chOne, StatusReady},
+		{chTwo, StatusReady},
+		{chLeaf, StatusReady},
+	}
+
+	for _, check := range checks {
+		assert.Equal(t, check.statusExp, check.task.Status,
+			"Task %v status expected: %v, actual: %v", check.task.ID, check.statusExp, check.task.Status)
+	}
 }
+
+func TestExec_Cancellation(t *testing.T) {
+	parent := NewTask("P", nil, "P", dumpExecFunc)
+	// Task child will be failed
+	errFunc := func(p interface{}) error { return errors.New("stop") }
+	child := NewTask("Ch", []ID{"P"}, "Ch", errFunc)
+	assert.NoError(t, parent.AddChild(*child))
+	// Task leaf shouldn't be executed
+	leaf := NewTask("Leaf", []ID{"Ch"}, "Leaf", dumpExecFunc)
+	assert.NoError(t, child.AddChild(*leaf))
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	go Exec(ctx, cancelFunc, parent)
+	go Exec(ctx, cancelFunc, child)
+
+	// Waiting Exec result for data consistency guarantee
+	assert.NoError(t, Exec(ctx, cancelFunc, leaf))
+
+	checks := []struct {
+		task      *Task
+		statusExp Status
+	}{
+		{parent, StatusReady},
+		{child, StatusError},
+		{leaf, StatusCancelled},
+	}
+
+	for _, check := range checks {
+		assert.Equal(t, check.statusExp, check.task.Status,
+			"Task %v status expected: %v, actual: %v", check.task.ID, check.statusExp, check.task.Status)
+	}
+}
+
+// Move to Job
+//func TestExec_NotAllParents(t *testing.T) {
+//	parent := NewTask("P", nil, "P", dumpExecFunc)
+//	child := NewTask("P", []ID{"P", "PPP"}, "P", dumpExecFunc)
+//	assert.NoError(t, parent.AddChild(*child))
+//
+//	ctx, cancelFunc := context.WithCancel(context.Background())
+//	go Exec(ctx, cancelFunc, parent)
+//	err := Exec(ctx, cancelFunc, child)
+//
+//	assert.Equal(t, err, "")
+//}

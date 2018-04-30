@@ -104,7 +104,7 @@ func Exec(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error 
 				log.Infof("Cancelling task %q", task.ID)
 				task.Status = StatusCancelled
 				cancelFunc()
-				break loop
+				return nil
 			}
 		}
 	}

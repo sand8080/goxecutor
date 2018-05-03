@@ -90,29 +90,9 @@ func (t *Task) AddChild(child *Task) error {
 	return nil
 }
 
-func prepareResult(result *interface{}) []byte {
-	if *result == nil {
-		return nil
-	}
-	resMarsh, errMarsh := json.Marshal(*result)
-	if errMarsh != nil {
-		log.Errorf("Task execution result marshalling error: %v. Result: %v", errMarsh, result)
-	}
-	return resMarsh
-}
-
-func saveDoResult(task *Task, result *interface{}) {
-	task.doResult = prepareResult(result)
-}
-
-func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error {
-	// Task lock prevents events mess up in case of multiple Do calls with the same task object.
-	task.Lock()
-	defer task.Unlock()
-
-	log.Debugf("Execution of task %q initiated", task.ID)
-
+func waitingReadiness(ctx context.Context, cancelFunc context.CancelFunc, task *Task) context.Context {
 	if task.waitingResult != nil {
+		log.Debugf("Task %v is waiting for completion of required tasks", task.ID)
 		task.Status = StatusWaiting
 		received := make(map[ID]bool, len(task.Requires))
 
@@ -137,14 +117,42 @@ func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error {
 				log.Infof("Cancelling task %q", task.ID)
 				task.Status = StatusCancelled
 				cancelFunc()
-				return nil
+				break loop
 			}
 		}
+	}
+	return ctx
+}
+
+func prepareResult(result *interface{}) []byte {
+	if *result == nil {
+		return nil
+	}
+	resMarsh, errMarsh := json.Marshal(*result)
+	if errMarsh != nil {
+		log.Errorf("Task execution result marshalling error: %v. Result: %v", errMarsh, result)
+	}
+	return resMarsh
+}
+
+func saveDoResult(task *Task, result *interface{}) {
+	task.doResult = prepareResult(result)
+}
+
+func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error {
+	// Task lock prevents events mess up in case of multiple Do calls with the same task object.
+	task.Lock()
+	defer task.Unlock()
+
+	log.Debugf("Execution of task %q initiated", task.ID)
+
+	ctx = waitingReadiness(ctx, cancelFunc, task)
+	if task.Status == StatusCancelled {
+		return nil
 	}
 
 	log.Debugf("Running task %q", task.ID)
 	task.Status = StatusRunning
-
 	res, err := task.do(ctx, task.Payload)
 	saveDoResult(task, &res)
 

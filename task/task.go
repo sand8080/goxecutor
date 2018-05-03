@@ -42,12 +42,13 @@ type Task struct {
 	Requires      map[ID]bool
 	Payload       interface{}
 	do            DoFunc
+	undo          DoFunc
 	RequiredFor   map[ID]bool
 	waitingResult chan taskResult
 	notifyResult  []chan<- taskResult
 }
 
-func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc) *Task {
+func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc, undoFunc DoFunc) *Task {
 	reqSet := make(map[ID]bool, len(requires))
 	for _, req := range requires {
 		reqSet[req] = true
@@ -86,8 +87,8 @@ func (t *Task) AddChild(child *Task) error {
 	return nil
 }
 
-func Exec(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error {
-	// Task lock prevents events mess up in case of multiple Exec calls with the same task object.
+func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error {
+	// Task lock prevents events mess up in case of multiple Do calls with the same task object.
 	task.Lock()
 	defer task.Unlock()
 

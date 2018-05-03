@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 
@@ -42,7 +43,9 @@ type Task struct {
 	Requires      map[ID]bool
 	Payload       interface{}
 	do            DoFunc
+	doResult      []byte
 	undo          DoFunc
+	undoResult    []byte
 	RequiredFor   map[ID]bool
 	waitingResult chan taskResult
 	notifyResult  []chan<- taskResult
@@ -87,6 +90,21 @@ func (t *Task) AddChild(child *Task) error {
 	return nil
 }
 
+func prepareResult(result *interface{}) []byte {
+	if *result == nil {
+		return nil
+	}
+	resMarsh, errMarsh := json.Marshal(*result)
+	if errMarsh != nil {
+		log.Errorf("Task execution result marshalling error: %v. Result: %v", errMarsh, result)
+	}
+	return resMarsh
+}
+
+func saveDoResult(task *Task, result *interface{}) {
+	task.doResult = prepareResult(result)
+}
+
 func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error {
 	// Task lock prevents events mess up in case of multiple Do calls with the same task object.
 	task.Lock()
@@ -128,6 +146,8 @@ func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error {
 	task.Status = StatusRunning
 
 	res, err := task.do(ctx, task.Payload)
+	saveDoResult(task, &res)
+
 	if err != nil {
 		log.Errorf("Task %q failed: %v", task.ID, err)
 		task.Status = StatusError

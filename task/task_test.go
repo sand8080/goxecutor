@@ -184,6 +184,31 @@ func TestExec_DataPipeline(t *testing.T) {
 	assert.NoError(t, Do(ctx, cancelFunc, child))
 }
 
+func Test_DoRespSaved(t *testing.T) {
+	checks := []struct {
+		do       DoFunc
+		expected []byte
+	}{
+		{dumpDoFunc, nil},
+		{func(context.Context, interface{}) (interface{}, error) {
+			return "sыь", nil
+		}, []byte("\"sыь\"")},
+		{func(context.Context, interface{}) (interface{}, error) {
+			return map[string]int{"a": 1}, nil
+		}, []byte("{\"a\":1}")},
+		{func(context.Context, interface{}) (interface{}, error) {
+			return map[string][]int{"a": {1, 2}}, nil
+		}, []byte("{\"a\":[1,2]}")},
+	}
+
+	for _, check := range checks {
+		task := NewTask("T", nil, nil, check.do, nil)
+		assert.NoError(t, Do(nil, nil, task))
+		assert.Equal(t, check.expected, task.doResult, "Expected: %s, actual: %s",
+			check.expected, task.doResult)
+	}
+}
+
 // Move to Job
 //func TestExec_NotAllParents(t *testing.T) {
 //	parent := NewTask("P", nil, "P", dumpDoFunc)

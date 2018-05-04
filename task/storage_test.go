@@ -13,7 +13,9 @@ type mockedStorage struct {
 }
 
 func newMockedStorage() *mockedStorage {
-	return &mockedStorage{}
+	storage := mockedStorage{}
+	storage.On("Save", mock.Anything).Return(nil)
+	return &storage
 }
 
 func (m *mockedStorage) Save(task *Task) error {

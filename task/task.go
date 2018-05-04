@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,6 +39,7 @@ type taskResult struct {
 
 type Task struct {
 	sync.Mutex
+	UUID          uuid.UUID
 	ID            ID
 	Status        Status
 	Requires      map[ID]bool
@@ -67,6 +69,7 @@ func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc, undoFunc 
 		RequiredFor:   make(map[ID]bool),
 		Payload:       payload,
 		do:            doFunc,
+		undo:          undoFunc,
 		waitingResult: waitingID,
 	}
 }
@@ -139,10 +142,15 @@ func saveDoResult(task *Task, result *interface{}) {
 	task.doResult = prepareResult(result)
 }
 
-func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task) error {
+func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task, storage Storage) error {
 	// Task lock prevents events mess up in case of multiple Do calls with the same task object.
 	task.Lock()
 	defer task.Unlock()
+	defer func() {
+		if err := storage.Save(task); err != nil {
+			log.Errorf("Saving task %v(%v) error: %v", task.ID, task.UUID, err)
+		}
+	}()
 
 	log.Debugf("Execution of task %q initiated", task.ID)
 

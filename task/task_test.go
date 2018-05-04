@@ -77,7 +77,7 @@ func TestTask_AddChild_AlreadyAdded(t *testing.T) {
 	assert.Error(t, ErrChildAlreadyAdded, parent.AddChild(chOne))
 }
 
-func TestExec(t *testing.T) {
+func TestDo(t *testing.T) {
 	parent := NewTask("P", nil, "P", dumpDoFunc, nil)
 	chOne := NewTask("ChOne", []ID{"P"}, "ChOne", dumpDoFunc, nil)
 	assert.NoError(t, parent.AddChild(chOne))
@@ -88,12 +88,13 @@ func TestExec(t *testing.T) {
 	assert.NoError(t, chTwo.AddChild(chLeaf))
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	go Do(ctx, cancelFunc, parent)
-	go Do(ctx, cancelFunc, chOne)
-	go Do(ctx, cancelFunc, chTwo)
+	storage := newMockedStorage()
+	go Do(ctx, cancelFunc, parent, storage)
+	go Do(ctx, cancelFunc, chOne, storage)
+	go Do(ctx, cancelFunc, chTwo, storage)
 
 	// Waiting Do result for data consistency guarantee
-	assert.NoError(t, Do(ctx, cancelFunc, chLeaf))
+	assert.NoError(t, Do(ctx, cancelFunc, chLeaf, storage))
 
 	checks := []struct {
 		task      *Task
@@ -111,7 +112,7 @@ func TestExec(t *testing.T) {
 	}
 }
 
-func TestExec_Cancellation(t *testing.T) {
+func TestDo_Cancellation(t *testing.T) {
 	parent := NewTask("P", nil, "P", dumpDoFunc, nil)
 	// Task child will be failed
 	errFunc := func(ctx context.Context, p interface{}) (interface{}, error) { return nil, errors.New("stop") }
@@ -122,11 +123,12 @@ func TestExec_Cancellation(t *testing.T) {
 	assert.NoError(t, child.AddChild(leaf))
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	go Do(ctx, cancelFunc, parent)
-	go Do(ctx, cancelFunc, child)
+	storage := newMockedStorage()
+	go Do(ctx, cancelFunc, parent, storage)
+	go Do(ctx, cancelFunc, child, storage)
 
 	// Waiting Do result for data consistency guarantee
-	assert.NoError(t, Do(ctx, cancelFunc, leaf))
+	assert.NoError(t, Do(ctx, cancelFunc, leaf, storage))
 
 	checks := []struct {
 		task      *Task
@@ -143,7 +145,7 @@ func TestExec_Cancellation(t *testing.T) {
 	}
 }
 
-func TestExec_DataPipeline(t *testing.T) {
+func TestDo_DataPipeline(t *testing.T) {
 	// Parent returns payload
 	pOneID, pOneValue := ID("POneID"), "POne result"
 	pOneFunc := func(ctx context.Context, payload interface{}) (interface{}, error) {
@@ -178,10 +180,11 @@ func TestExec_DataPipeline(t *testing.T) {
 	assert.NoError(t, pThree.AddChild(child))
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	go Do(ctx, cancelFunc, pOne)
-	go Do(ctx, cancelFunc, pTwo)
-	go Do(ctx, cancelFunc, pThree)
-	assert.NoError(t, Do(ctx, cancelFunc, child))
+	storage := newMockedStorage()
+	go Do(ctx, cancelFunc, pOne, storage)
+	go Do(ctx, cancelFunc, pTwo, storage)
+	go Do(ctx, cancelFunc, pThree, storage)
+	assert.NoError(t, Do(ctx, cancelFunc, child, storage))
 }
 
 func Test_DoRespSaved(t *testing.T) {
@@ -201,9 +204,10 @@ func Test_DoRespSaved(t *testing.T) {
 		}, []byte("{\"a\":[1,2]}")},
 	}
 
+	storage := newMockedStorage()
 	for _, check := range checks {
 		task := NewTask("T", nil, nil, check.do, nil)
-		assert.NoError(t, Do(nil, nil, task))
+		assert.NoError(t, Do(nil, nil, task, storage))
 		assert.Equal(t, check.expected, task.doResult, "Expected: %s, actual: %s",
 			check.expected, task.doResult)
 	}

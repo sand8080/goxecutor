@@ -1,10 +1,11 @@
-package task
+package task_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
-	"errors"
+	. "github.com/sand8080/goxecutor/task"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,19 +21,21 @@ func dumpDoFunc(ctx context.Context, payload interface{}) (interface{}, error) {
 
 func TestNewTask(t *testing.T) {
 	nilReq := NewTask("P", nil, nil, dumpDoFunc, nil)
-	assert.Equal(t, StatusNew, nilReq.Status, "Expected task status: %v, got: %v", StatusNew, nilReq.Status)
+	assert.Equal(t, StatusNew, nilReq.Status, "Expected task status: %v, got: %v",
+		StatusNew, nilReq.Status)
 	assert.NotNil(t, nilReq.RequiredFor, "Added child map doesn't initialized")
-	assert.Nil(t, nilReq.waitingResult, "Waiting channel must be nil if requires empty or nil")
+	assert.Nil(t, nilReq.WaitingResult, "Waiting channel must be nil if requires empty or nil")
 
 	emptyReq := NewTask("P", []ID{}, nil, dumpDoFunc, nil)
-	assert.Equal(t, StatusNew, emptyReq.Status, "Expected task status: %v, got: %v", StatusNew, emptyReq.Status)
+	assert.Equal(t, StatusNew, emptyReq.Status, "Expected task status: %v, got: %v",
+		StatusNew, emptyReq.Status)
 	assert.NotNil(t, emptyReq.RequiredFor, "Added child map doesn't initialized")
-	assert.Nil(t, emptyReq.waitingResult, "Waiting channel must be nil if requires empty or nil")
+	assert.Nil(t, emptyReq.WaitingResult, "Waiting channel must be nil if requires empty or nil")
 
 	withReq := NewTask("WithReq", []ID{"Req1", "Req2"}, nil, dumpDoFunc, nil)
 	assert.True(t, withReq.Requires["Req1"])
 	assert.True(t, withReq.Requires["Req2"])
-	assert.NotNil(t, withReq.waitingResult)
+	assert.NotNil(t, withReq.WaitingResult)
 }
 
 func TestTask_AddChild(t *testing.T) {
@@ -51,11 +54,11 @@ func TestTask_AddChild(t *testing.T) {
 
 	// Checking channels are registered in parent
 	// Channel type cast to chan<-
-	var woCh chan<- taskResult = chOne.waitingResult
-	assert.Contains(t, parent.notifyResult, woCh)
+	var woCh chan<- Result = chOne.WaitingResult
+	assert.Contains(t, parent.NotifyResult, woCh)
 
-	woCh = chTwo.waitingResult
-	assert.Contains(t, parent.notifyResult, woCh)
+	woCh = chTwo.WaitingResult
+	assert.Contains(t, parent.NotifyResult, woCh)
 }
 
 func TestTask_AddChild_NotChild(t *testing.T) {
@@ -108,7 +111,8 @@ func TestDo(t *testing.T) {
 
 	for _, check := range checks {
 		assert.Equal(t, check.statusExp, check.task.Status,
-			"Task %v status expected: %v, actual: %v", check.task.ID, check.statusExp, check.task.Status)
+			"Task %v status expected: %v, actual: %v", check.task.ID,
+			check.statusExp, check.task.Status)
 	}
 }
 
@@ -141,7 +145,8 @@ func TestDo_Cancellation(t *testing.T) {
 
 	for _, check := range checks {
 		assert.Equal(t, check.statusExp, check.task.Status,
-			"Task %v status expected: %v, actual: %v", check.task.ID, check.statusExp, check.task.Status)
+			"Task %v status expected: %v, actual: %v", check.task.ID,
+			check.statusExp, check.task.Status)
 	}
 }
 
@@ -208,20 +213,7 @@ func Test_DoRespSaved(t *testing.T) {
 	for _, check := range checks {
 		task := NewTask("T", nil, nil, check.do, nil)
 		assert.NoError(t, Do(nil, nil, task, storage))
-		assert.Equal(t, check.expected, task.doResult, "Expected: %s, actual: %s",
-			check.expected, task.doResult)
+		assert.Equal(t, check.expected, task.DoResult, "Expected: %s, actual: %s",
+			check.expected, task.DoResult)
 	}
 }
-
-// Move to Job
-//func TestExec_NotAllParents(t *testing.T) {
-//	parent := NewTask("P", nil, "P", dumpDoFunc)
-//	child := NewTask("P", []ID{"P", "PPP"}, "P", dumpDoFunc)
-//	assert.NoError(t, parent.AddChild(*child))
-//
-//	ctx, cancelFunc := context.WithCancel(context.Background())
-//	go Do(ctx, cancelFunc, parent)
-//	err := Do(ctx, cancelFunc, child)
-//
-//	assert.Equal(t, err, "")
-//}

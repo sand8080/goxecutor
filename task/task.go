@@ -32,7 +32,7 @@ var ErrChildAlreadyAdded = errors.New("child already added")
 // with task.ID as key.
 type DoFunc func(ctx context.Context, payload interface{}) (interface{}, error)
 
-type taskResult struct {
+type Result struct {
 	id     ID
 	result interface{}
 }
@@ -45,12 +45,12 @@ type Task struct {
 	Requires      map[ID]bool
 	Payload       interface{}
 	do            DoFunc
-	doResult      []byte
+	DoResult      []byte
 	undo          DoFunc
-	undoResult    []byte
+	UndoResult    []byte
 	RequiredFor   map[ID]bool
-	waitingResult chan taskResult
-	notifyResult  []chan<- taskResult
+	WaitingResult chan Result
+	NotifyResult  []chan<- Result
 }
 
 func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc, undoFunc DoFunc) *Task {
@@ -58,9 +58,9 @@ func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc, undoFunc 
 	for _, req := range requires {
 		reqSet[req] = true
 	}
-	var waitingID chan taskResult
+	var waitingID chan Result
 	if len(requires) > 0 {
-		waitingID = make(chan taskResult, len(requires))
+		waitingID = make(chan Result, len(requires))
 	}
 	return &Task{
 		ID:            id,
@@ -70,7 +70,7 @@ func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc, undoFunc 
 		Payload:       payload,
 		do:            doFunc,
 		undo:          undoFunc,
-		waitingResult: waitingID,
+		WaitingResult: waitingID,
 	}
 }
 
@@ -88,13 +88,13 @@ func (t *Task) AddChild(child *Task) error {
 		return ErrChildAlreadyAdded
 	}
 
-	t.notifyResult = append(t.notifyResult, child.waitingResult)
+	t.NotifyResult = append(t.NotifyResult, child.WaitingResult)
 	t.RequiredFor[child.ID] = true
 	return nil
 }
 
 func waitingReadiness(ctx context.Context, cancelFunc context.CancelFunc, task *Task) context.Context {
-	if task.waitingResult != nil {
+	if task.WaitingResult != nil {
 		log.Debugf("Task %v is waiting for completion of required tasks", task.ID)
 		task.Status = StatusWaiting
 		received := make(map[ID]bool, len(task.Requires))
@@ -102,7 +102,7 @@ func waitingReadiness(ctx context.Context, cancelFunc context.CancelFunc, task *
 	loop:
 		for {
 			select {
-			case res := <-task.waitingResult:
+			case res := <-task.WaitingResult:
 				log.Debugf("%v is notified: task %q is finished.", task.ID, res.id)
 				received[res.id] = true
 
@@ -139,7 +139,7 @@ func prepareResult(result *interface{}) []byte {
 }
 
 func saveDoResult(task *Task, result *interface{}) {
-	task.doResult = prepareResult(result)
+	task.DoResult = prepareResult(result)
 }
 
 func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task, storage Storage) error {
@@ -175,9 +175,9 @@ func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task, storage 
 	task.Status = StatusReady
 	log.Debugf("Task %q is ready", task.ID)
 
-	for _, notifCh := range task.notifyResult {
+	for _, notifCh := range task.NotifyResult {
 		log.Debugf("Sending notification about %v is finished to %v", task.ID, notifCh)
-		notifCh <- taskResult{task.ID, res}
+		notifCh <- Result{task.ID, res}
 	}
 	log.Infof("Task %q execution is finished", task.ID)
 

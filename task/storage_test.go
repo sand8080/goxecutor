@@ -1,9 +1,10 @@
-package task
+package task_test
 
 import (
 	"context"
 	"testing"
 
+	. "github.com/sand8080/goxecutor/task"
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/mock"
 )

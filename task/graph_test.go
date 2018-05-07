@@ -1,11 +1,10 @@
-package task_test
+package task
 
 import (
 	"sort"
 	"testing"
 
 	"github.com/cznic/mathutil"
-	. "github.com/sand8080/goxecutor/task"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )

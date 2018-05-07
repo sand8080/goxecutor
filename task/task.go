@@ -49,8 +49,8 @@ type Task struct {
 	undo          DoFunc
 	UndoResult    []byte
 	RequiredFor   map[ID]bool
-	WaitingResult chan Result
-	NotifyResult  []chan<- Result
+	waitingResult chan Result
+	notifyResult  []chan<- Result
 }
 
 func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc, undoFunc DoFunc) *Task {
@@ -70,7 +70,7 @@ func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc, undoFunc 
 		Payload:       payload,
 		do:            doFunc,
 		undo:          undoFunc,
-		WaitingResult: waitingID,
+		waitingResult: waitingID,
 	}
 }
 
@@ -88,13 +88,13 @@ func (t *Task) AddChild(child *Task) error {
 		return ErrChildAlreadyAdded
 	}
 
-	t.NotifyResult = append(t.NotifyResult, child.WaitingResult)
+	t.notifyResult = append(t.notifyResult, child.waitingResult)
 	t.RequiredFor[child.ID] = true
 	return nil
 }
 
 func waitingReadiness(ctx context.Context, cancelFunc context.CancelFunc, task *Task) context.Context {
-	if task.WaitingResult != nil {
+	if task.waitingResult != nil {
 		log.Debugf("Task %v is waiting for completion of required tasks", task.ID)
 		task.Status = StatusWaiting
 		received := make(map[ID]bool, len(task.Requires))
@@ -102,7 +102,7 @@ func waitingReadiness(ctx context.Context, cancelFunc context.CancelFunc, task *
 	loop:
 		for {
 			select {
-			case res := <-task.WaitingResult:
+			case res := <-task.waitingResult:
 				log.Debugf("%v is notified: task %q is finished.", task.ID, res.id)
 				received[res.id] = true
 
@@ -175,7 +175,7 @@ func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task, storage 
 	task.Status = StatusReady
 	log.Debugf("Task %q is ready", task.ID)
 
-	for _, notifCh := range task.NotifyResult {
+	for _, notifCh := range task.notifyResult {
 		log.Debugf("Sending notification about %v is finished to %v", task.ID, notifCh)
 		notifCh <- Result{task.ID, res}
 	}

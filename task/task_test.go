@@ -1,11 +1,10 @@
-package task_test
+package task
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	. "github.com/sand8080/goxecutor/task"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,18 +23,18 @@ func TestNewTask(t *testing.T) {
 	assert.Equal(t, StatusNew, nilReq.Status, "Expected task status: %v, got: %v",
 		StatusNew, nilReq.Status)
 	assert.NotNil(t, nilReq.RequiredFor, "Added child map doesn't initialized")
-	assert.Nil(t, nilReq.WaitingResult, "Waiting channel must be nil if requires empty or nil")
+	assert.Nil(t, nilReq.waitingResult, "Waiting channel must be nil if requires empty or nil")
 
 	emptyReq := NewTask("P", []ID{}, nil, dumpDoFunc, nil)
 	assert.Equal(t, StatusNew, emptyReq.Status, "Expected task status: %v, got: %v",
 		StatusNew, emptyReq.Status)
 	assert.NotNil(t, emptyReq.RequiredFor, "Added child map doesn't initialized")
-	assert.Nil(t, emptyReq.WaitingResult, "Waiting channel must be nil if requires empty or nil")
+	assert.Nil(t, emptyReq.waitingResult, "Waiting channel must be nil if requires empty or nil")
 
 	withReq := NewTask("WithReq", []ID{"Req1", "Req2"}, nil, dumpDoFunc, nil)
 	assert.True(t, withReq.Requires["Req1"])
 	assert.True(t, withReq.Requires["Req2"])
-	assert.NotNil(t, withReq.WaitingResult)
+	assert.NotNil(t, withReq.waitingResult)
 }
 
 func TestTask_AddChild(t *testing.T) {
@@ -54,11 +53,11 @@ func TestTask_AddChild(t *testing.T) {
 
 	// Checking channels are registered in parent
 	// Channel type cast to chan<-
-	var woCh chan<- Result = chOne.WaitingResult
-	assert.Contains(t, parent.NotifyResult, woCh)
+	var woCh chan<- Result = chOne.waitingResult
+	assert.Contains(t, parent.notifyResult, woCh)
 
-	woCh = chTwo.WaitingResult
-	assert.Contains(t, parent.NotifyResult, woCh)
+	woCh = chTwo.waitingResult
+	assert.Contains(t, parent.notifyResult, woCh)
 }
 
 func TestTask_AddChild_NotChild(t *testing.T) {

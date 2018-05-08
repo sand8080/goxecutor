@@ -1,10 +1,13 @@
-package task
+package graph
 
 import (
 	"errors"
 	"sync"
 
+	"context"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/sand8080/goxecutor/task"
 )
 
 var ErrNoRootsInGraph = errors.New("no root tasks in graph")
@@ -15,20 +18,37 @@ var ErrTaskCyclesInGraph = errors.New("tasks cycles in graph")
 
 var ErrTaskUnreached = errors.New("tasks unreached in graph")
 
+var ErrPolicyNotHandled = errors.New("execution policy not handled")
+
 type Graph struct {
 	sync.RWMutex
 	Name           string
-	tasks          map[ID]*Task
-	roots          map[ID]*Task
-	waitingParents map[ID][]*Task
+	tasks          map[task.ID]*task.Task
+	roots          map[task.ID]*task.Task
+	waitingParents map[task.ID][]*task.Task
 }
+
+type ExecutionStatus string
+
+const (
+	StatusSuccess   ExecutionStatus = "SUCCESS"
+	StatusError     ExecutionStatus = "ERROR"
+	StatusCancelled ExecutionStatus = "CANCELLED"
+)
+
+type ExecutionPolicy string
+
+const (
+	PolicyRevertOnError ExecutionPolicy = "REVERT_ON_ERROR"
+	PolicyIgnoreError   ExecutionPolicy = "IGNORE_ERROR"
+)
 
 func NewGraph(name string) *Graph {
 	return &Graph{
 		Name:           name,
-		tasks:          make(map[ID]*Task),
-		roots:          make(map[ID]*Task),
-		waitingParents: make(map[ID][]*Task),
+		tasks:          make(map[task.ID]*task.Task),
+		roots:          make(map[task.ID]*task.Task),
+		waitingParents: make(map[task.ID][]*task.Task),
 	}
 }
 
@@ -42,12 +62,12 @@ const (
 )
 
 type tasksCycles struct {
-	from ID
-	to   ID
+	from task.ID
+	to   task.ID
 }
 
 // Adds task to the appropriate place in the graph.
-func (graph *Graph) Add(task *Task) error {
+func (graph *Graph) Add(task *task.Task) error {
 	graph.Lock()
 	defer graph.Unlock()
 
@@ -101,7 +121,7 @@ func (graph *Graph) Check() error {
 func (graph *Graph) CheckWaitingParents() error {
 	if len(graph.waitingParents) > 0 {
 		for childID, parents := range graph.waitingParents {
-			parentIDs := make([]ID, len(parents))
+			parentIDs := make([]task.ID, len(parents))
 			for idx, parent := range parents {
 				parentIDs[idx] = parent.ID
 			}
@@ -120,8 +140,8 @@ func (graph *Graph) CheckRoots() error {
 }
 
 func (graph *Graph) CheckCycles() error {
-	discover := make(map[ID]taskColor, len(graph.tasks))
-	errs := make(map[ID][]tasksCycles, len(graph.roots))
+	discover := make(map[task.ID]taskColor, len(graph.tasks))
+	errs := make(map[task.ID][]tasksCycles, len(graph.roots))
 
 	for _, root := range graph.roots {
 		cycles := make([]tasksCycles, 0)
@@ -138,7 +158,7 @@ func (graph *Graph) CheckCycles() error {
 
 	// Checking all tasks are reached
 	if len(discover) < len(graph.tasks) {
-		unreached := make([]ID, 0, len(graph.tasks)-len(discover))
+		unreached := make([]task.ID, 0, len(graph.tasks)-len(discover))
 		for taskID := range graph.tasks {
 			_, ok := discover[taskID]
 			if !ok {
@@ -152,15 +172,56 @@ func (graph *Graph) CheckCycles() error {
 	return nil
 }
 
-func (graph *Graph) depthFirstSearch(task *Task, discover map[ID]taskColor, cycles *[]tasksCycles) {
-	discover[task.ID] = GREY
-	for childID := range task.RequiredFor {
+func (graph *Graph) depthFirstSearch(t *task.Task, discover map[task.ID]taskColor, cycles *[]tasksCycles) {
+	discover[t.ID] = GREY
+	for childID := range t.RequiredFor {
 		childColor := discover[childID]
 		if childColor == WHITE {
 			graph.depthFirstSearch(graph.tasks[childID], discover, cycles)
 		} else if childColor == GREY {
-			*cycles = append(*cycles, tasksCycles{task.ID, childID})
+			*cycles = append(*cycles, tasksCycles{t.ID, childID})
 		}
 	}
-	discover[task.ID] = BLACK
+	discover[t.ID] = BLACK
+}
+
+func (graph *Graph) tasksStatuses() map[task.Status]uint {
+	result := make(map[task.Status]uint)
+	for _, task := range graph.tasks {
+		result[task.Status] += 1
+	}
+	return result
+}
+
+func (graph *Graph) Exec(policy ExecutionPolicy, storage task.Storage) (ExecutionStatus, error) {
+	var wg sync.WaitGroup
+	ctx, cancelFunc := context.WithCancel(context.Background())
+
+	doTask := func(t *task.Task) {
+		task.Do(ctx, cancelFunc, t, storage)
+		wg.Done()
+	}
+
+	for _, t := range graph.tasks {
+		wg.Add(1)
+		go doTask(t)
+	}
+
+	wg.Wait()
+
+	// TODO(sand8080): handle execution policies
+	tasksStatuses := graph.tasksStatuses()
+	switch policy {
+	case PolicyIgnoreError:
+		var s ExecutionStatus
+		if tasksStatuses[task.StatusError] != 0 {
+			s = StatusError
+		} else {
+			s = StatusSuccess
+		}
+		return s, nil
+	default:
+		log.Errorf("Execution policy %v doesn't handled", policy)
+		return "", ErrPolicyNotHandled
+	}
 }

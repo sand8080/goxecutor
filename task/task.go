@@ -15,12 +15,12 @@ type ID string
 type Status string
 
 const (
-	StatusNew       = Status("NEW")
-	StatusWaiting   = Status("WAITING")
-	StatusRunning   = Status("RUNNING")
-	StatusReady     = Status("READY")
-	StatusCancelled = Status("CANCELLED")
-	StatusError     = Status("ERROR")
+	StatusNew       Status = "NEW"
+	StatusWaiting   Status = "WAITING"
+	StatusRunning   Status = "RUNNING"
+	StatusReady     Status = "READY"
+	StatusCancelled Status = "CANCELLED"
+	StatusError     Status = "ERROR"
 )
 
 var ErrNotChild = errors.New("adding non required child")

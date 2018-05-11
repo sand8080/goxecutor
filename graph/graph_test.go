@@ -51,6 +51,16 @@ func doNothing(ctx context.Context, payload interface{}) (interface{}, error) {
 	return nil, nil
 }
 
+func doError(ctx context.Context, payload interface{}) (interface{}, error) {
+	var msg string
+	if payload != nil {
+		msg = payload.(string)
+	} else {
+		msg = "doing wrong things"
+	}
+	return nil, errors.New(msg)
+}
+
 func TestGraph_AddTaskInDifferentOrder(t *testing.T) {
 	tasksFunc := func() map[task.ID]*task.Task {
 		t1 := task.NewTask("t1", nil, nil, nil, nil)
@@ -297,16 +307,91 @@ func TestGraph_Check(t *testing.T) {
 	}
 }
 
-func TestGraph_Exec(t *testing.T) {
-	graph := NewGraph("")
-	parent := task.NewTask("P", nil, nil, doNothing, doNothing)
-	child := task.NewTask("CH", []task.ID{"P"}, nil, doNothing, doNothing)
-	graph.Add(parent)
-	graph.Add(child)
+func assertTaskStatusesEqual(t *testing.T, lh, rh map[task.Status][]task.ID) {
 
-	storage := newMapStorage()
-	status, err := graph.Exec(PolicyIgnoreError, storage)
+	keysSet := func(m map[task.Status][]task.ID) map[task.Status]bool {
+		res := make(map[task.Status]bool, len(m))
+		for key := range m {
+			res[key] = true
+		}
+		return res
+	}
 
-	assert.NoError(t, err)
-	assert.Equal(t, StatusSuccess, status)
+	toSet := func(tasks []task.ID) map[task.ID]bool {
+		res := make(map[task.ID]bool, len(tasks))
+		for _, ID := range tasks {
+			res[ID] = true
+		}
+		return res
+	}
+
+	assert.True(t, len(lh) == len(rh), "Maps sizes are different")
+	assert.Equal(t, keysSet(lh), keysSet(rh), "Different keysSet in maps")
+	for lhKey, lhVal := range lh {
+		assert.Equal(t, toSet(lhVal), toSet(rh[lhKey]))
+	}
+}
+
+func TestGraph_Statuses(t *testing.T) {
+	cases := []struct {
+		tasks          []*task.Task
+		policy         ExecutionPolicy
+		expStatuses    map[task.Status][]task.ID
+		expGraphStatus ExecutionStatus
+	}{
+		{
+			tasks: []*task.Task{
+				task.NewTask("P", nil, nil, doNothing, doNothing),
+				task.NewTask("CH", []task.ID{"P"}, nil, doNothing, doNothing),
+			},
+			policy: PolicyIgnoreError,
+			expStatuses: map[task.Status][]task.ID{
+				task.StatusReady: {"P", "CH"},
+			},
+			expGraphStatus: StatusSuccess,
+		},
+		{
+			tasks: []*task.Task{
+				task.NewTask("P", nil, nil, doNothing, doNothing),
+				task.NewTask("CH", []task.ID{"P"}, nil, doNothing, doNothing),
+				task.NewTask("CH_ERR", []task.ID{"CH"}, nil, doError, doNothing),
+			},
+			policy: PolicyIgnoreError,
+			expStatuses: map[task.Status][]task.ID{
+				task.StatusReady: {"P", "CH"},
+				task.StatusError: {"CH_ERR"},
+			},
+			expGraphStatus: StatusError,
+		},
+		{
+			tasks: []*task.Task{
+				task.NewTask("P", nil, nil, doNothing, doNothing),
+				task.NewTask("CH_ERR", []task.ID{"P"}, nil, doError, doNothing),
+				task.NewTask("CH_CANCEL", []task.ID{"CH_ERR"}, nil, doNothing, doNothing),
+			},
+			policy: PolicyIgnoreError,
+			expStatuses: map[task.Status][]task.ID{
+				task.StatusReady:     {"P"},
+				task.StatusError:     {"CH_ERR"},
+				task.StatusCancelled: {"CH_CANCEL"},
+			},
+			expGraphStatus: StatusError,
+		},
+	}
+
+	for _, c := range cases {
+		graph := NewGraph("")
+		storage := newMapStorage()
+		for _, t := range c.tasks {
+			graph.Add(t)
+		}
+
+		actGraphStatus, err := graph.Exec(c.policy, storage)
+		assert.NoError(t, err)
+
+		actStatuses := graph.tasksStatuses()
+		assertTaskStatusesEqual(t, c.expStatuses, actStatuses)
+
+		assert.Equal(t, c.expGraphStatus, actGraphStatus)
+	}
 }

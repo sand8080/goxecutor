@@ -185,10 +185,10 @@ func (graph *Graph) depthFirstSearch(t *task.Task, discover map[task.ID]taskColo
 	discover[t.ID] = BLACK
 }
 
-func (graph *Graph) tasksStatuses() map[task.Status]uint {
-	result := make(map[task.Status]uint)
+func (graph *Graph) tasksStatuses() map[task.Status][]task.ID {
+	result := make(map[task.Status][]task.ID)
 	for _, task := range graph.tasks {
-		result[task.Status] += 1
+		result[task.Status] = append(result[task.Status], task.ID)
 	}
 	return result
 }
@@ -214,7 +214,7 @@ func (graph *Graph) Exec(policy ExecutionPolicy, storage task.Storage) (Executio
 	switch policy {
 	case PolicyIgnoreError:
 		var s ExecutionStatus
-		if tasksStatuses[task.StatusError] != 0 {
+		if len(tasksStatuses[task.StatusError]) > 0 {
 			s = StatusError
 		} else {
 			s = StatusSuccess

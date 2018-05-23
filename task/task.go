@@ -46,8 +46,10 @@ type Task struct {
 	Payload       interface{}
 	do            DoFunc
 	DoResult      []byte
+	DoError       error
 	undo          DoFunc
 	UndoResult    []byte
+	UndoError     error
 	RequiredFor   map[ID]bool
 	waitingResult chan Result
 	notifyResult  []chan<- Result
@@ -167,6 +169,7 @@ func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task, storage 
 	if err != nil {
 		log.Errorf("Task %q failed: %v", task.ID, err)
 		task.Status = StatusError
+		task.DoError = err
 		log.Debugf("Execution cancellation initiated from task %q", task.ID)
 		cancelFunc()
 		return err

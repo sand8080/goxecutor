@@ -130,7 +130,7 @@ func TestGraph_checkWaitingParents(t *testing.T) {
 				task.NewTask("child1", []task.ID{"root"}, nil, nil, nil),
 				task.NewTask("child2", []task.ID{"root"}, nil, nil, nil),
 			},
-			expErr: ErrNoRootsInGraph,
+			expErr: ErrTaskWaitingParents,
 		},
 	}
 
@@ -275,7 +275,7 @@ func TestGraph_Check(t *testing.T) {
 				task.NewTask("t3", []task.ID{"t2", "t4"}, nil, nil, nil),
 				task.NewTask("t5", []task.ID{"t2"}, nil, nil, nil),
 			},
-			expErr: ErrNoRootsInGraph,
+			expErr: ErrTaskWaitingParents,
 		},
 		{
 			// Cycle for t1: from t3 to t2 and from t4 to t4

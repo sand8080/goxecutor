@@ -10,16 +10,22 @@ import (
 	"github.com/sand8080/goxecutor/task"
 )
 
+// ErrNoRootsInGraph no root tasks in graph error
 var ErrNoRootsInGraph = errors.New("no root tasks in graph")
 
-var ErrTaskWaitingParents = errors.New("no root tasks in graph")
+// ErrTaskWaitingParents task without parents in graph error
+var ErrTaskWaitingParents = errors.New("tasks without parents")
 
+// ErrTaskCyclesInGraph tasks cycles error
 var ErrTaskCyclesInGraph = errors.New("tasks cycles in graph")
 
+// ErrTaskUnreached unreachable task error
 var ErrTaskUnreached = errors.New("tasks unreached in graph")
 
+// ErrPolicyNotHandled unknown execution policy error
 var ErrPolicyNotHandled = errors.New("execution policy not handled")
 
+// Graph describes tasks graph structure
 type Graph struct {
 	sync.RWMutex
 	Name           string
@@ -28,21 +34,29 @@ type Graph struct {
 	waitingParents map[task.ID][]*task.Task
 }
 
+// ExecutionStatus graph execution status
 type ExecutionStatus string
 
 const (
+	// StatusSuccess graph executed successfully
 	StatusSuccess   ExecutionStatus = "SUCCESS"
+	// StatusError graph executed with error
 	StatusError     ExecutionStatus = "ERROR"
+	// StatusCancelled graph execution cancelled
 	StatusCancelled ExecutionStatus = "CANCELLED"
 )
 
+// ExecutionPolicy defines graph execution policy
 type ExecutionPolicy string
 
 const (
+	// PolicyRevertOnError guarantees undo is called on executed tasks in case of error
 	PolicyRevertOnError ExecutionPolicy = "REVERT_ON_ERROR"
+	// PolicyIgnoreError ignores errors on graph execution
 	PolicyIgnoreError   ExecutionPolicy = "IGNORE_ERROR"
 )
 
+// NewGraph creates new graph
 func NewGraph(name string) *Graph {
 	return &Graph{
 		Name:           name,
@@ -56,9 +70,9 @@ func NewGraph(name string) *Graph {
 type taskColor uint8
 
 const (
-	WHITE taskColor = iota
-	GREY
-	BLACK
+	white taskColor = iota
+	grey
+	black
 )
 
 type tasksCycles struct {
@@ -66,7 +80,7 @@ type tasksCycles struct {
 	to   task.ID
 }
 
-// Adds task to the appropriate place in the graph.
+// Add adds task to the appropriate place in the graph.
 func (graph *Graph) Add(task *task.Task) error {
 	graph.Lock()
 	defer graph.Unlock()
@@ -105,19 +119,24 @@ func (graph *Graph) Add(task *task.Task) error {
 	return nil
 }
 
+// Check checks graph is valid
 func (graph *Graph) Check() error {
-	if err := graph.CheckRoots(); err != nil {
+	err := graph.CheckRoots()
+	if err != nil {
 		return err
 	}
-	if err := graph.CheckWaitingParents(); err != nil {
+	err = graph.CheckWaitingParents()
+	if err != nil {
 		return err
 	}
-	if err := graph.CheckCycles(); err != nil {
+	err = graph.CheckCycles()
+	if err != nil {
 		return err
 	}
 	return nil
 }
 
+// CheckWaitingParents checks if tasks without parents in graph
 func (graph *Graph) CheckWaitingParents() error {
 	if len(graph.waitingParents) > 0 {
 		for childID, parents := range graph.waitingParents {
@@ -132,6 +151,7 @@ func (graph *Graph) CheckWaitingParents() error {
 	return nil
 }
 
+// CheckRoots checks if root tasks are created
 func (graph *Graph) CheckRoots() error {
 	if len(graph.roots) == 0 {
 		return ErrNoRootsInGraph
@@ -139,6 +159,7 @@ func (graph *Graph) CheckRoots() error {
 	return nil
 }
 
+// CheckCycles checks tasks cycles in graph
 func (graph *Graph) CheckCycles() error {
 	discover := make(map[task.ID]taskColor, len(graph.tasks))
 	errs := make(map[task.ID][]tasksCycles, len(graph.roots))
@@ -173,16 +194,16 @@ func (graph *Graph) CheckCycles() error {
 }
 
 func (graph *Graph) depthFirstSearch(t *task.Task, discover map[task.ID]taskColor, cycles *[]tasksCycles) {
-	discover[t.ID] = GREY
+	discover[t.ID] = grey
 	for childID := range t.RequiredFor {
 		childColor := discover[childID]
-		if childColor == WHITE {
+		if childColor == white {
 			graph.depthFirstSearch(graph.tasks[childID], discover, cycles)
-		} else if childColor == GREY {
+		} else if childColor == grey {
 			*cycles = append(*cycles, tasksCycles{t.ID, childID})
 		}
 	}
-	discover[t.ID] = BLACK
+	discover[t.ID] = black
 }
 
 func (graph *Graph) tasksStatuses() map[task.Status][]task.ID {
@@ -193,6 +214,7 @@ func (graph *Graph) tasksStatuses() map[task.Status][]task.ID {
 	return result
 }
 
+// Exec executes graph with provided policy. Stores execution progress in storage.
 func (graph *Graph) Exec(policy ExecutionPolicy, storage task.Storage) (ExecutionStatus, error) {
 	var wg sync.WaitGroup
 	ctx, cancelFunc := context.WithCancel(context.Background())

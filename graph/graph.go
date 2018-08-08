@@ -39,9 +39,9 @@ type ExecutionStatus string
 
 const (
 	// StatusSuccess graph executed successfully
-	StatusSuccess   ExecutionStatus = "SUCCESS"
+	StatusSuccess ExecutionStatus = "SUCCESS"
 	// StatusError graph executed with error
-	StatusError     ExecutionStatus = "ERROR"
+	StatusError ExecutionStatus = "ERROR"
 	// StatusCancelled graph execution cancelled
 	StatusCancelled ExecutionStatus = "CANCELLED"
 )
@@ -53,7 +53,7 @@ const (
 	// PolicyRevertOnError guarantees undo is called on executed tasks in case of error
 	PolicyRevertOnError ExecutionPolicy = "REVERT_ON_ERROR"
 	// PolicyIgnoreError ignores errors on graph execution
-	PolicyIgnoreError   ExecutionPolicy = "IGNORE_ERROR"
+	PolicyIgnoreError ExecutionPolicy = "IGNORE_ERROR"
 )
 
 // NewGraph creates new graph

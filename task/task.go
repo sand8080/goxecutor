@@ -10,51 +10,74 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// ID is human readable unique per graph task identifier
 type ID string
 
+// Status is task status
 type Status string
 
 const (
+	// StatusNew status of new task
 	StatusNew       Status = "NEW"
+	// StatusWaiting status of task waiting for required tasks completion
 	StatusWaiting   Status = "WAITING"
+	// StatusRunning status of executing task
 	StatusRunning   Status = "RUNNING"
+	// StatusReady status of successfully executed task
 	StatusReady     Status = "READY"
+	// StatusCancelled status of cancelled task
 	StatusCancelled Status = "CANCELLED"
+	// StatusError status of task executed with error
 	StatusError     Status = "ERROR"
 )
 
+// ErrNotChild error on adding a child task that not requires the task
 var ErrNotChild = errors.New("adding non required child")
 
+// ErrChildAlreadyAdded error on adding already added child
 var ErrChildAlreadyAdded = errors.New("child already added")
 
 // DoFunc is task payload processing function.
-// If DoFunc returns not nil value and there are no error the value  will be saved in context as value
+// If DoFunc returns not nil value and there are no error the value will be saved in context as value
 // with task.ID as key.
 type DoFunc func(ctx context.Context, payload interface{}) (interface{}, error)
 
+// Result describes task execution result
 type Result struct {
 	id     ID
 	result interface{}
 }
 
+// Task describes task structure
 type Task struct {
 	sync.Mutex
-	UUID          uuid.UUID
-	ID            ID
-	Status        Status
+	// UUID is storage specific identifier
+	UUID uuid.UUID
+	// ID is human readable unique per graph task identifier
+	ID ID
+	// Status is task status
+	Status Status
+	// Requires is map of tasks required for the task execution
 	Requires      map[ID]bool
+	// Payload is task payload
 	Payload       interface{}
 	do            DoFunc
+	// DoResult is result of task execution
 	DoResult      []byte
+	// DoError is error of task execution
 	DoError       error
 	undo          DoFunc
+	// UndoResult is result of task revert
 	UndoResult    []byte
+	// UndoError is error of task revert
 	UndoError     error
+	// RequiredFor is map of tasks requires the task execution
 	RequiredFor   map[ID]bool
 	waitingResult chan Result
 	notifyResult  []chan<- Result
 }
 
+// NewTask creates new task
 func NewTask(id ID, requires []ID, payload interface{}, doFunc DoFunc, undoFunc DoFunc) *Task {
 	reqSet := make(map[ID]bool, len(requires))
 	for _, req := range requires {
@@ -144,6 +167,7 @@ func saveDoResult(task *Task, result *interface{}) {
 	task.DoResult = prepareResult(result)
 }
 
+// Do executes task
 func Do(ctx context.Context, cancelFunc context.CancelFunc, task *Task, storage Storage) error {
 	// Task lock prevents events mess up in case of multiple Do calls with the same task object.
 	task.Lock()

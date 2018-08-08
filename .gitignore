@@ -24,3 +24,6 @@
 
 # Test coverage reports
 reports
+
+# Vendoring
+vendor

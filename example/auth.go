@@ -12,17 +12,20 @@ import (
 	"net/http/httptest"
 )
 
+// AuthReq auth example request
 type AuthReq struct {
 	url      string
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
+// AuthResp auth example response
 type AuthResp struct {
 	Status string `json:"status"`
 	Token  string `json:"token"`
 }
 
+// AuthFunc example implementation of business logic
 func AuthFunc(ctx context.Context, payload interface{}) (interface{}, error) {
 	auth, ok := payload.(AuthReq)
 	if !ok {
@@ -51,11 +54,13 @@ func AuthFunc(ctx context.Context, payload interface{}) (interface{}, error) {
 	return authResp.Token, nil
 }
 
+// NewAuthTask creates auth task
 func NewAuthTask(ID task.ID, url, login, password string) *task.Task {
 	payload := AuthReq{url, login, password}
 	return task.NewTask(ID, nil, payload, AuthFunc, nil)
 }
 
+// AuthServer implements test auth server
 func AuthServer(login, password, token string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

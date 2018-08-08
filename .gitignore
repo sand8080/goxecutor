@@ -21,3 +21,6 @@
 
 # IDE project files
 .idea
+
+# Test coverage reports
+reports

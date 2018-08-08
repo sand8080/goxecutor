@@ -10,16 +10,19 @@ import (
 	"github.com/sand8080/goxecutor/task"
 )
 
+// BalanceReq example balance request
 type BalanceReq struct {
 	url      string
 	tokenKey task.ID
 }
 
+// BalanceResp example balance response
 type BalanceResp struct {
 	Status  string `json:"status"`
 	Balance int    `json:"balance"`
 }
 
+// BalanceFunc example implementation of business logic
 func BalanceFunc(ctx context.Context, payload interface{}) (interface{}, error) {
 	balance, ok := payload.(BalanceReq)
 	if !ok {
@@ -56,11 +59,13 @@ func BalanceFunc(ctx context.Context, payload interface{}) (interface{}, error) 
 	return balanceResp.Balance, nil
 }
 
+// NewBalanceTask creates balance fetching task
 func NewBalanceTask(ID task.ID, url string, tokenKey task.ID) *task.Task {
 	payload := BalanceReq{url, tokenKey}
 	return task.NewTask(ID, []task.ID{tokenKey}, payload, BalanceFunc, nil)
 }
 
+// BalanceServer implements test auth server
 func BalanceServer(token string, balance int) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

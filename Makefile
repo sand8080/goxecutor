@@ -1,46 +1,48 @@
-IMPORT_PATH := github.com/sand8080/goxecutor
-IGNORED_PACKAGES := /vendor/
+GOPACKAGES?=$(shell find . -name '*.go' -not -path "./vendor/*" -exec dirname {} \;| sort | uniq)
+GOFILES?=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
+CWD?=$(shell pwd)
+COVER_REPORTS=$(CWD)/reports
 
-all: test
+all: help
 
-.PHONY: help test vet fmt vendor
+.PHONY: help build run fmt vendor clean test coverage check vet lint
 
 help:
-	@echo "test - run tests"
-	@echo "vet  - run vet"
-	@echo "fmt  - format application sources"
+	@echo "fmt            - format application sources"
+	@echo "clean          - remove artifacts"
+	@echo "test           - run tests"
+	@echo "cover          - run tests with coverage, generates coverage reports"
+	@echo "check          - check code style"
+	@echo "vet            - run go vet"
+	@echo "lint           - run golint"
+	@echo "vendor         - install the project's dependencies"
 
-vendor: .GOPATH/.ok
-	$(shell ( cd $(CURDIR)/.GOPATH/src/$(IMPORT_PATH) && GOPATH=$(CURDIR)/.GOPATH dep ensure))
+fmt:
+	go fmt $(GOPACKAGES)
 
-test: .GOPATH/.ok vendor vet fmt
-	go test -v $(allpackages)
+build: clean
+	go build -o bin/service-entrypoint ./cmd/service
 
-vet: .GOPATH/.ok
-	go vet $(allpackages)
-
-fmt: .GOPATH/.ok
-	go fmt $(allpackages)
+vendor:
+	dep ensure
 
 clean:
-	rm -rf bin .GOPATH
+	go clean
 
-# cd into the GOPATH to workaround ./... not following symlinks
-_allpackages = $(shell ( cd $(CURDIR)/.GOPATH/src/$(IMPORT_PATH) && \
-    GOPATH=$(CURDIR)/.GOPATH go list ./... 2>&1 1>&3 | \
-    grep -v -e "^$$" $(addprefix -e ,$(IGNORED_PACKAGES)) 1>&2 ) 3>&1 | \
-    grep -v -e "^$$" $(addprefix -e ,$(IGNORED_PACKAGES)))
+test: clean
+	go test $(GOPACKAGES)
 
-# memoize allpackages, so that it's executed only once and only if used
-allpackages = $(if $(__allpackages),,$(eval __allpackages := $$(_allpackages)))$(__allpackages)
+cover: clean
+	@mkdir -p $(COVER_REPORTS)
+	@for PKG in $(GOPACKAGES) ; do \
+		REPORT=$${PKG//[\/.]/_}.out; \
+		CONFIG_PATH=$(CONFIG_PATH) go test -coverprofile=$(COVER_REPORTS)/$$REPORT $$PKG; \
+	done
 
-export GOPATH := $(CURDIR)/.GOPATH
-unexport GOBIN
+check: vet lint
 
-.GOPATH/.ok:
-	@mkdir -p "$(dir .GOPATH/src/$(IMPORT_PATH))"
-	@ln -s ../../../.. ".GOPATH/src/$(IMPORT_PATH)"
-	@mkdir -p .GOPATH/test .GOPATH/cover
-	@mkdir -p bin
-	@ln -s ../bin .GOPATH/bin
-	@touch $@
+vet:
+	go vet $(GOPACKAGES)
+
+lint:
+	ls $(GOFILES) | xargs -L1 golint

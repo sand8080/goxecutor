@@ -60,9 +60,9 @@ func BalanceFunc(ctx context.Context, payload interface{}) (interface{}, error) 
 }
 
 // NewBalanceTask creates balance fetching task
-func NewBalanceTask(ID task.ID, url string, tokenKey task.ID) *task.Task {
+func NewBalanceTask(id task.ID, url string, tokenKey task.ID) *task.Task {
 	payload := BalanceReq{url, tokenKey}
-	return task.NewTask(ID, []task.ID{tokenKey}, payload, BalanceFunc, nil)
+	return task.NewTask(id, []task.ID{tokenKey}, payload, BalanceFunc, nil)
 }
 
 // BalanceServer implements test auth server

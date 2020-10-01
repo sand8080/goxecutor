@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 
 	"github.com/sand8080/goxecutor/task"
-	"io/ioutil"
-	"net/http/httptest"
 )
 
 // AuthReq auth example request
@@ -55,9 +55,9 @@ func AuthFunc(ctx context.Context, payload interface{}) (interface{}, error) {
 }
 
 // NewAuthTask creates auth task
-func NewAuthTask(ID task.ID, url, login, password string) *task.Task {
+func NewAuthTask(id task.ID, url, login, password string) *task.Task {
 	payload := AuthReq{url, login, password}
-	return task.NewTask(ID, nil, payload, AuthFunc, nil)
+	return task.NewTask(id, nil, payload, AuthFunc, nil)
 }
 
 // AuthServer implements test auth server
@@ -71,7 +71,7 @@ func AuthServer(login, password, token string) *httptest.Server {
 		}
 
 		req := AuthReq{}
-		if err := json.Unmarshal(body, &req); err != nil {
+		if err = json.Unmarshal(body, &req); err != nil {
 			writeError(w, err)
 			return
 		}

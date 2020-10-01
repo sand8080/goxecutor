@@ -1,7 +1,7 @@
 package example
 
 import (
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/sand8080/goxecutor/task"

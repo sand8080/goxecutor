@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/cznic/mathutil"
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -29,7 +29,7 @@ func (s *MapStorage) Save(t *task.Task) error {
 	defer s.Unlock()
 
 	if t.UUID == uuid.Nil {
-		t.UUID = uuid.NewV4()
+		t.UUID = uuid.New()
 	}
 	s.tasks[t.UUID] = t
 	return nil

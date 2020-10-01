@@ -1,10 +1,10 @@
 package graph
 
 import (
+	"context"
 	"errors"
 	"sync"
 
-	"context"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/sand8080/goxecutor/task"
@@ -220,7 +220,7 @@ func (graph *Graph) Exec(policy ExecutionPolicy, storage task.Storage) (Executio
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	doTask := func(t *task.Task) {
-		task.Do(ctx, cancelFunc, t, storage)
+		_ = task.Do(ctx, cancelFunc, t, storage)
 		wg.Done()
 	}
 

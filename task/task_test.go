@@ -211,7 +211,7 @@ func Test_DoRespSaved(t *testing.T) {
 	storage := newMockedStorage()
 	for _, check := range checks {
 		task := NewTask("T", nil, nil, check.do, nil)
-		assert.NoError(t, Do(nil, nil, task, storage))
+		assert.NoError(t, Do(context.TODO(), nil, task, storage))
 		assert.Equal(t, check.expected, task.DoResult, "Expected: %s, actual: %s",
 			check.expected, task.DoResult)
 	}

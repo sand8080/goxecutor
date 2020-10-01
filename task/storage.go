@@ -1,6 +1,6 @@
 package task
 
-import "github.com/satori/go.uuid"
+import "github.com/google/uuid"
 
 // Storage defines storage interface
 type Storage interface {

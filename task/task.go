@@ -6,7 +6,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,17 +18,17 @@ type Status string
 
 const (
 	// StatusNew status of new task
-	StatusNew       Status = "NEW"
+	StatusNew Status = "NEW"
 	// StatusWaiting status of task waiting for required tasks completion
-	StatusWaiting   Status = "WAITING"
+	StatusWaiting Status = "WAITING"
 	// StatusRunning status of executing task
-	StatusRunning   Status = "RUNNING"
+	StatusRunning Status = "RUNNING"
 	// StatusReady status of successfully executed task
-	StatusReady     Status = "READY"
+	StatusReady Status = "READY"
 	// StatusCancelled status of cancelled task
 	StatusCancelled Status = "CANCELLED"
 	// StatusError status of task executed with error
-	StatusError     Status = "ERROR"
+	StatusError Status = "ERROR"
 )
 
 // ErrNotChild error on adding a child task that not requires the task
@@ -58,19 +58,19 @@ type Task struct {
 	// Status is task status
 	Status Status
 	// Requires is map of tasks required for the task execution
-	Requires      map[ID]bool
+	Requires map[ID]bool
 	// Payload is task payload
-	Payload       interface{}
-	do            DoFunc
+	Payload interface{}
+	do      DoFunc
 	// DoResult is result of task execution
-	DoResult      []byte
+	DoResult []byte
 	// DoError is error of task execution
-	DoError       error
-	undo          DoFunc
+	DoError error
+	undo    DoFunc
 	// UndoResult is result of task revert
-	UndoResult    []byte
+	UndoResult []byte
 	// UndoError is error of task revert
-	UndoError     error
+	UndoError error
 	// RequiredFor is map of tasks requires the task execution
 	RequiredFor   map[ID]bool
 	waitingResult chan Result

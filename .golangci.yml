@@ -1,0 +1,32 @@
+run:
+  build-tags:
+    - integration
+linters-settings:
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0.8
+  goimports:
+    local-prefixes: github.com/sand8080/goxecutor
+  errcheck:
+      exclude: .errcheck.exclude.txt
+linters:
+  enable:
+    - goimports
+    - golint
+    - gosec
+    - interfacer
+    - unconvert
+    - goconst
+    - gocyclo
+    - depguard
+    - nakedret
+    - prealloc
+    - gocritic
+issues:
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - errcheck

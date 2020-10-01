@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 )
 

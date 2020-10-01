@@ -25,5 +25,5 @@
 # Test coverage reports
 reports
 
-# Vendoring
-vendor
+# Mac files
+.DS_Store

@@ -1,48 +1,37 @@
 GOPACKAGES?=$(shell find . -name '*.go' -not -path "./vendor/*" -exec dirname {} \;| sort | uniq)
-GOFILES?=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
-CWD?=$(shell pwd)
-COVER_REPORTS=$(CWD)/reports
+GOFLAGS?="-count=1" # Disabling test cache
+GO111MODULE=on
+GOLANGCI=$(shell which golangci-lint)
+COVER_REPORTS=reports
 
 all: help
 
-.PHONY: help build run fmt vendor clean test coverage check vet lint
+.PHONY: help run fmt vendor clean test coverage check vet lint
 
 help:
 	@echo "fmt            - format application sources"
-	@echo "clean          - remove artifacts"
+	@echo "check          - check code style"
 	@echo "test           - run tests"
 	@echo "cover          - run tests with coverage, generates coverage reports"
-	@echo "check          - check code style"
-	@echo "vet            - run go vet"
-	@echo "lint           - run golint"
-	@echo "vendor         - install the project's dependencies"
+	@echo "clean          - remove artifacts"
 
 fmt:
-	go fmt $(GOPACKAGES)
+	@goimports -local "sv-tv" -w $(GOPACKAGES)  || go fmt $(GOPACKAGES)
 
-build: clean
-	go build -o bin/service-entrypoint ./cmd/service
-
-vendor:
-	dep ensure
+check:
+	@echo "Performing code check"
+	@if [ -z "$(GOLANGCI)" ]; then \
+		docker run --rm -v "$(PWD):/go/src/goxecutor" \
+			-w /go/src/goxecutor golangci/golangci-lint golangci-lint run --config .golangci.yml; \
+	else \
+		golangci-lint run --config .golangci.yml; \
+	fi
 
 clean:
-	go clean
+	@go clean ./...
 
 test: clean
-	go test $(GOPACKAGES)
+	@GOFLAGS=$(GOFLAGS) go test $(TEST_PARAMS) $(GOPACKAGES) ./...
 
-cover: clean
-	@mkdir -p $(COVER_REPORTS)
-	@for PKG in $(GOPACKAGES) ; do \
-		REPORT=$${PKG//[\/.]/_}.out; \
-		CONFIG_PATH=$(CONFIG_PATH) go test -coverprofile=$(COVER_REPORTS)/$$REPORT $$PKG; \
-	done
-
-check: vet lint
-
-vet:
-	go vet $(GOPACKAGES)
-
-lint:
-	ls $(GOFILES) | xargs -L1 golint
+coverage: TEST_PARAMS=-coverprofile=$(COVER_REPORTS)/coverage.out
+coverage: test

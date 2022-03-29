@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/sand8080/goxecutor/internal"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,9 +21,9 @@ func Test_GetBalance(t *testing.T) {
 	// Constructing tasks graph
 	g := internal.NewGraph("GetBalance")
 	authTask := NewAuthTask("auth", authServer.URL, "l", "p")
-	g.Add(authTask)
+	_ = g.Add(authTask)
 	balanceTask := NewBalanceTask("balance", balanceServer.URL, authTask.ID)
-	g.Add(balanceTask)
+	_ = g.Add(balanceTask)
 
 	// Checking graph
 	assert.NoError(t, g.Check())

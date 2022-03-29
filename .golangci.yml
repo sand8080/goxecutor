@@ -1,21 +1,17 @@
 run:
   build-tags:
     - integration
+  timeout: 5m
 linters-settings:
   govet:
     check-shadowing: true
-  golint:
-    min-confidence: 0.8
   goimports:
     local-prefixes: github.com/sand8080/goxecutor
-  errcheck:
-      exclude: .errcheck.exclude.txt
 linters:
   enable:
+    - govet
     - goimports
-    - golint
     - gosec
-    - interfacer
     - unconvert
     - goconst
     - gocyclo
@@ -23,6 +19,9 @@ linters:
     - nakedret
     - prealloc
     - gocritic
+    - exportloopref
+    - bodyclose
+    - durationcheck
 issues:
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:

@@ -2,36 +2,38 @@ GOPACKAGES?=$(shell find . -name '*.go' -not -path "./vendor/*" -exec dirname {}
 GOFLAGS?="-count=1" # Disabling test cache
 GO111MODULE=on
 GOLANGCI=$(shell which golangci-lint)
-COVER_REPORTS=reports
+COVER_REPORTS?="reports"
 
 all: help
 
-.PHONY: help run fmt vendor clean test coverage check vet lint
+.PHONY: help clean fmt check test coverage
 
 help:
+	@echo "clean          - remove artifacts"
 	@echo "fmt            - format application sources"
 	@echo "check          - check code style"
 	@echo "test           - run tests"
-	@echo "cover          - run tests with coverage, generate coverage reports"
-	@echo "clean          - remove artifacts"
+	@echo "coverage       - run tests with coverage, generate coverage reports"
+
+clean:
+	@go clean ./...
 
 fmt:
-	@goimports -local "goxecutor" -w $(GOPACKAGES)  || go fmt $(GOPACKAGES)
+	@goimports -local "goxecutor" -w $(GOPACKAGES) || go fmt $(GOPACKAGES)
 
 check:
 	@echo "Performing code check"
 	@if [ -z "$(GOLANGCI)" ]; then \
 		docker run --rm -v "$(PWD):/go/src/goxecutor" \
-			-w /go/src/goxecutor golangci/golangci-lint golangci-lint run --config .golangci.yml; \
+			-w /go/src/goxecutor golangci/golangci-lint:v1.43 golangci-lint run --config .golangci.yml; \
 	else \
 		golangci-lint run --config .golangci.yml; \
 	fi
 
-clean:
-	@go clean ./...
-
 test: clean
-	@GOFLAGS=$(GOFLAGS) go test $(TEST_PARAMS) $(GOPACKAGES) ./...
+	@GOFLAGS=$(GOFLAGS) go test -race -tags=integration $(TEST_PARAMS) $(GOPACKAGES)
 
 coverage: TEST_PARAMS=-coverprofile=$(COVER_REPORTS)/coverage.out
 coverage: test
+coverage:
+	@go tool cover -html=reports/coverage.out

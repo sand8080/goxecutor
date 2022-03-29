@@ -26,7 +26,7 @@ type AuthResp struct {
 }
 
 // AuthFunc example implementation of business logic
-func AuthFunc(ctx context.Context, payload interface{}) (interface{}, error) {
+func AuthFunc(_ context.Context, payload interface{}) (interface{}, error) {
 	auth, ok := payload.(AuthReq)
 	if !ok {
 		return nil, errors.New("cast to AuthReq failed")
@@ -40,7 +40,7 @@ func AuthFunc(ctx context.Context, payload interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	authResp := AuthResp{}
 	err = json.NewDecoder(resp.Body).Decode(&authResp)
@@ -88,11 +88,11 @@ func AuthServer(login, password, token string) *httptest.Server {
 			writeError(w, err)
 			return
 		}
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 }
 
 func writeError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
-	w.Write([]byte(err.Error()))
+	_, _ = w.Write([]byte(err.Error()))
 }

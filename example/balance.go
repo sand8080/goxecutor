@@ -45,7 +45,7 @@ func BalanceFunc(ctx context.Context, payload interface{}) (interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	balanceResp := BalanceResp{}
 	err = json.NewDecoder(resp.Body).Decode(&balanceResp)
@@ -84,6 +84,6 @@ func BalanceServer(token string, balance int) *httptest.Server {
 			writeError(w, err)
 			return
 		}
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 }

@@ -12,11 +12,11 @@ help:
 	@echo "fmt            - format application sources"
 	@echo "check          - check code style"
 	@echo "test           - run tests"
-	@echo "cover          - run tests with coverage, generates coverage reports"
+	@echo "cover          - run tests with coverage, generate coverage reports"
 	@echo "clean          - remove artifacts"
 
 fmt:
-	@goimports -local "sv-tv" -w $(GOPACKAGES)  || go fmt $(GOPACKAGES)
+	@goimports -local "goxecutor" -w $(GOPACKAGES)  || go fmt $(GOPACKAGES)
 
 check:
 	@echo "Performing code check"

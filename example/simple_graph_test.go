@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/sand8080/goxecutor/internal"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/sand8080/goxecutor/graph"
 )
 
 func Test_GetBalance(t *testing.T) {
@@ -19,7 +18,7 @@ func Test_GetBalance(t *testing.T) {
 	defer balanceServer.Close()
 
 	// Constructing tasks graph
-	g := graph.NewGraph("GetBalance")
+	g := internal.NewGraph("GetBalance")
 	authTask := NewAuthTask("auth", authServer.URL, "l", "p")
 	g.Add(authTask)
 	balanceTask := NewBalanceTask("balance", balanceServer.URL, authTask.ID)
@@ -29,8 +28,8 @@ func Test_GetBalance(t *testing.T) {
 	assert.NoError(t, g.Check())
 
 	// Executing graph
-	status, err := g.Exec(graph.PolicyIgnoreError, NewMockedStorage())
-	assert.Equal(t, graph.StatusSuccess, status)
+	status, err := g.Exec(internal.PolicyIgnoreError, NewMockedStorage())
+	assert.Equal(t, internal.StatusSuccess, status)
 	assert.NoError(t, err)
 
 	// Checking tasks statuses
